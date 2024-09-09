@@ -6,7 +6,7 @@ import numpy as np
 
 import cv2
 import glob
-import scipy as sp
+import imageio
 import os
 import scipy.io as sio
 
@@ -16,32 +16,32 @@ def load_mnist(data_type,y_dim=10):
         print(os.path.join(data_dir,'train-images-idx3-ubyte'))
         fd = open(os.path.join(data_dir,'train-images.idx3-ubyte'))
         loaded = np.fromfile(file=fd,dtype=np.uint8)
-        trX = loaded[16:].reshape((60000,28,28,1)).astype(np.float)
+        trX = loaded[16:].reshape((60000,28,28,1)).astype(float)
     
         fd = open(os.path.join(data_dir,'train-labels.idx1-ubyte'))
         loaded = np.fromfile(file=fd,dtype=np.uint8)
-        trY = loaded[8:].reshape((60000)).astype(np.float)
+        trY = loaded[8:].reshape((60000)).astype(float)
     
         fd = open(os.path.join(data_dir,'t10k-images.idx3-ubyte'))
         loaded = np.fromfile(file=fd,dtype=np.uint8)
-        teX = loaded[16:].reshape((10000,28,28,1)).astype(np.float)
+        teX = loaded[16:].reshape((10000,28,28,1)).astype(float)
     
         fd = open(os.path.join(data_dir,'t10k-labels.idx1-ubyte'))
         loaded = np.fromfile(file=fd,dtype=np.uint8)
-        teY = loaded[8:].reshape((10000)).astype(np.float)
+        teY = loaded[8:].reshape((10000)).astype(float)
     
         trY = np.asarray(trY)
         teY = np.asarray(teY)
         
         if data_type == "train":
             X = trX[0:50000,:,:,:]
-            y = trY[0:50000].astype(np.int)
+            y = trY[0:50000].astype(int)
         elif data_type == "test":
             X = teX
-            y = teY.astype(np.int)
+            y = teY.astype(int)
         elif data_type == "val":
             X = trX[50000:60000,:,:,:]
-            y = trY[50000:60000].astype(np.int)
+            y = trY[50000:60000].astype(int)
             
         seed = 547
         np.random.seed(seed)
@@ -49,7 +49,7 @@ def load_mnist(data_type,y_dim=10):
         np.random.seed(seed)
         np.random.shuffle(y)
 
-        y_vec = np.zeros((len(y), y_dim), dtype=np.float)
+        y_vec = np.zeros((len(y), y_dim), dtype=float)
         for i, label in enumerate(y):
           y_vec[i,y[i]] = 1.0
         
@@ -75,8 +75,9 @@ def transform_image(input_data,labels,class_transform,input_size,maxAng):
         else:
             angle_use = 0
         angOut[k] = angle_use
+        angle_use = np.squeeze(angle_use).item()
         M = cv2.getRotationMatrix2D((img_h/2,img_w/2),angle_use,1)
-        imgOut[k,:,:,:] = np.expand_dims(cv2.warpAffine(imgTemp,M,(img_h,img_w)),axis=3)
+        imgOut[k,:,:,:] = np.expand_dims(cv2.warpAffine(imgTemp,M,(img_h,img_w)),axis=2)
         
     return imgOut,angOut
 
@@ -104,10 +105,12 @@ def transform_image_pair(input_data,labels,class_transform,input_size,maxAng,ang
             angle_use_1 = 0
         angOut[k,0] = angle_use_0
         angOut[k,1] = angle_use_1
+        angle_use_0 = np.squeeze(angle_use_0).item()
+        angle_use_1 = np.squeeze(angle_use_1).item()
         M_0 = cv2.getRotationMatrix2D((img_h/2,img_w/2),angle_use_0,1)
-        imgOut_0[k,:,:,:] = np.expand_dims(cv2.warpAffine(imgTemp,M_0,(img_h,img_w)),axis=3)
+        imgOut_0[k,:,:,:] = np.expand_dims(cv2.warpAffine(imgTemp,M_0,(img_h,img_w)),axis=2)
         M_1 = cv2.getRotationMatrix2D((img_h/2,img_w/2),angle_use_1,1)
-        imgOut_1[k,:,:,:] = np.expand_dims(cv2.warpAffine(imgTemp,M_1,(img_h,img_w)),axis=3)
+        imgOut_1[k,:,:,:] = np.expand_dims(cv2.warpAffine(imgTemp,M_1,(img_h,img_w)),axis=2)
         
     return imgOut_0,imgOut_1,angOut
     
@@ -136,7 +139,7 @@ def inverse_transform(images):
   return (images+1.)/2.
 
 def imsave(images, size, path):
-  return sp.misc.imsave(path, merge(images, size))
+  return imageio.imwrite(path, (merge(images, size)*255).astype(np.uint8))
 
 def merge(images, size):
   h, w = images.shape[1], images.shape[2]

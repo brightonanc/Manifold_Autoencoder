@@ -31,7 +31,7 @@ parser.add_argument('--b1', type=float, default=0.5, help='adam: momentum term')
 parser.add_argument('--b2', type=float, default=0.999, help='adam: momentum term')
 parser.add_argument('--gamma', type=float, default=0.00008, help='gd: weight on dictionary element')
 parser.add_argument('--zeta', type=float, default=0.000001, help='gd: weight on coefficient regularizer')
-parser.add_argument('--to_weight', type=float, default=0.01, help='Weight for transport operator loss')
+parser.add_argument('--to_weight_lambda', type=float, default=0.01, help='Weight for transport operator loss')
 parser.add_argument('--n_cpu', type=int, default=4, help='number of cpu threads to use during batch generation')
 parser.add_argument('--img_size', type=int, default=32, help='size of each image dimension')
 parser.add_argument('--channels', type=int, default=1, help='number of image channels')
@@ -39,6 +39,7 @@ parser.add_argument('--M', type=int, default=4, help='Number of dictionary eleme
 parser.add_argument('--decay', type=float, default=0.999, help='Decay weight')
 parser.add_argument('--data_use', type=str,default = 'gait',help='Specify which dataset to use [concen_circle,rotDigits,gait]')
 parser.add_argument('--training_phase', type=str,default = 'finetune',help='Specify which training phase to run [AE_train,transOpt_train,finetune]')
+parser.add_argument('--checkpoint_path', type=str, default='', help='For phases after AE_train, the path to the checkpoint (e.g. /home/marissa/Dropbox/Documents/Tensorflow/autoencoder_transform_pytorch/final_code/MAE_gait_batch32_zdim2_zeta1e-06_gamma8e-05_scale10.0_M4_transOpt_train/network_batch32_zdim2_zeta1e-06_gamma8e-05_step6.pt')
 opt = parser.parse_args()
 print(opt)
 
@@ -115,11 +116,16 @@ if data_use == 'concen_circle':
     from fullyConnectedModel import Decoder
 
     mapMat = np.random.uniform(-1,1,(x_dim,z_dim))
+    save_folder_concen_circle = './' +  opt.model + opt.data_use + '_zdim' + str(opt.z_dim) + '/'
+    if not os.path.exists(save_folder_concen_circle):
+        os.makedirs(save_folder_concen_circle)
     if opt.training_phase == 'AE_train':
-        sio.savemat(save_folder + 'mapMat_circleHighDim_z' + str(z_dim) + '_x' + str(x_dim) +'.mat',{'mapMat':mapMat})
+        sio.savemat(os.path.join(
+            save_folder_concen_circle, 'mapMat_circleHighDim_z' + str(z_dim) + '_x' + str(x_dim) +'.mat'
+        ), {'mapMat':mapMat})
     else:
-        mat_folder = './' +  opt.model + opt.data_use  + '_batch' + str(opt.batch_size) + '_zdim' + str(opt.z_dim) + '_zeta' + str(zeta) + '_gamma' + str(opt.gamma) + '_scale' + str(1.0) + '_M' + str(M) + '_AE_train/'
-        mat_load = sio.loadmat(mat_folder + 'mapMat_circleHighDim_z' + str(z_dim) +  '_x' + str(x_dim) +'.mat')
+        mat_file = os.path.join(save_folder_concen_circle, 'mapMat_circleHighDim_z' + str(z_dim) +  '_x' + str(x_dim) +'.mat')
+        mat_load = sio.loadmat(mat_file)
         mapMat = mat_load['mapMat']
     [noisy_circles,y_circles] = ds.make_circles(n_samples=nTrain, factor=.5,
                                               noise=noise_std)
@@ -155,7 +161,7 @@ elif data_use == 'rotDigits':
 elif data_use == 'gait':
     from fullyConnectedLargeModel import Encoder
     from fullyConnectedLargeModel import Decoder
-    data_folder = '/home/marissa/Documents/Data/CMU_moCap/subject_035'
+    data_folder = '/home/marissa/Documents/Data/CMU_moCap/subject_035' #TODO: fix
     sample_inputs,frameUse_sample = load_gait_data(data_folder,test_size,opt.x_dim,'val') 
     data_y = np.zeros((sample_inputs.shape[0],1)) 
     sample_inputs_torch = torch.from_numpy(sample_inputs)
@@ -176,9 +182,12 @@ if opt.training_phase == 'AE_train':
     decoder.apply(weights_init_normal)
 else:
     # Load current set of network weights and transport operator weights
-    checkpoint_folder = '/home/marissa/Dropbox/Documents/Tensorflow/autoencoder_transform_pytorch/final_code/MAE_gait_batch32_zdim2_zeta1e-06_gamma8e-05_scale10.0_M4_transOpt_train'
-    checkpoint_file = 'network_batch32_zdim2_zeta1e-06_gamma8e-05_step6.pt'
-    checkpoint = torch.load(checkpoint_folder + '/' + checkpoint_file)
+    if not os.path.isfile(opt.checkpoint_path):
+        raise ValueError('Need a --checkpoint_path to be provided')
+    checkpoint_path = os.path.realpath(opt.checkpoint_path)
+    checkpoint_folder = os.path.dirname(checkpoint_path)
+    checkpoint_file = os.path.basename(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path)
     encoder.load_state_dict(checkpoint['model_state_dict_encoder'])
     decoder.load_state_dict(checkpoint['model_state_dict_decoder'])
     Psi = checkpoint['Psi']
@@ -259,7 +268,7 @@ for step in xrange(opt.steps):
         if opt.training_phase == 'transOpt_train':
             auto_loss = t_loss
         else:
-            auto_loss = auto_loss_0 + auto_loss_1 + opt.to_weight*t_loss.float()
+            auto_loss = auto_loss_0 + auto_loss_1 + opt.to_weight_lambda*t_loss.float()
         # Store the original loss values prior to the transport operator gradient step
         loss_val_comp = np.zeros((2))
         Psi_comp = np.zeros((2,N_use,M))    
@@ -349,7 +358,7 @@ for step in xrange(opt.steps):
             'loss_auto_1':loss_auto_1[:counter],'loss_trans':loss_trans[:counter],'Psi_new':Psi_new,'loss_frob':loss_frob[:counter],'params':opt,'sample_latent':sample_latent.detach().numpy(),
             'sample_out':sample_out.detach().numpy(),'sample_inputs':sample_inputs,'lr_max':lr_max,'lr_save':lr_save[:counter]});
         trainParams_save = {'zeta':zeta,'gamma':opt.gamma,'batch_size':opt.batch_size,'Psi_std':Psi_std,'normalize_val':normalize_val,'data_use':data_use,'params':opt,
-                                               'lr_psi':lr_psi,'scale':scale,'M':M,'decay':decay,'lr_all':opt.lr,'to_weight':opt.to_weight,'lr_max':lr_max}
+                                               'lr_psi':lr_psi,'scale':scale,'M':M,'decay':decay,'lr_all':opt.lr,'to_weight_lambda':opt.to_weight_lambda,'lr_max':lr_max}
         if opt.training_phase != 'AE_train':
             trainParams_save['checkpoint_folder'] = checkpoint_folder
             trainParams_save['checkpoint_file'] = checkpoint_file

@@ -20,7 +20,7 @@ def transOptObj_c(c,Psi,x0,x1,zeta):
     Outputs:
         - objFun: Computed transport operator objective
     """
-    N = np.int(np.sqrt(Psi.shape[0]))
+    N = int(np.sqrt(Psi.shape[0]))
     coeff_use = np.expand_dims(c,axis=1)
     x0_use = np.expand_dims(x0,axis=1)
     A = np.reshape(np.dot(Psi,coeff_use),(N,N),order='F')
@@ -47,7 +47,7 @@ def transOptDerv_c(c,Psi,x0,x1,zeta):
     Outputs:
         - c_grad: Gradient of the transport operator objective with repsect to the coefficients
     """
-    N = np.int(np.sqrt(Psi.shape[0]))
+    N = int(np.sqrt(Psi.shape[0]))
     coeff_use = np.expand_dims(c,axis=1)
     M = coeff_use.shape[0]
     x0_use = np.expand_dims(x0,axis=1)

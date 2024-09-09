@@ -17,8 +17,8 @@ class TransOptFunction(Function):
         Apply the transformation matrix defined by coeff_use and Psi to the 
         input latent vector
         """
-        N = np.int(np.sqrt(Psi.shape[0]))
-        M = np.int(Psi.shape[1])
+        N = int(np.sqrt(Psi.shape[0]))
+        M = int(Psi.shape[1])
         batch_size = input.shape[0]
         ctx.save_for_backward(input,Psi)
         input_coeff,Psi= input.detach().numpy(), Psi.detach().numpy()
@@ -45,14 +45,14 @@ class TransOptFunction(Function):
         """
         input,Psi = ctx.saved_tensors
         input_coeff,Psi= input.detach().numpy(), Psi.detach().numpy()
-        N = np.int(np.sqrt(Psi.shape[0]))
-        M = np.int(Psi.shape[1])
+        N = int(np.sqrt(Psi.shape[0]))
+        M = int(Psi.shape[1])
         batch_size = input.shape[0]
         input_np = input_coeff[:,0:N]
         coeff = input_coeff[:,N:]
         grad_output = grad_output.detach().numpy()
         c_grad_total = np.zeros((batch_size,M))
-        Psi_grad_total = np.zeros((np.int(N*N),M))
+        Psi_grad_total = np.zeros((int(N*N),M))
         grad_z0_total = np.zeros((batch_size,N))
         
 
